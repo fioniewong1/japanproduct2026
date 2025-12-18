@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>日本購物格價簿 🌸</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="shortcut icon" type="image/png" href="icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sakura: { 100: '#fff5f7', 200: '#fecdd3', 500: '#f43f5e', 800: '#881337' },
+                    },
+                    fontFamily: { sans: ['Noto Sans JP', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #fff5f7; color: #881337; }
+        .item-card { touch-action: manipulation; transition: transform 0.1s; cursor: pointer; }
+        .modal { transition: opacity 0.2s; }
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #ef4444; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #ef4444; } 
+    </style>
+</head>
+<body class="p-3 max-w-md mx-auto min-h-screen pb-40">
+
+    <header class="flex justify-between items-end mb-4 px-1">
+        <div>
+            <h1 class="text-xl font-bold tracking-widest text-sakura-800">お買い物帳</h1>
+            <p class="text-[10px] text-sakura-500">多店舖格價版</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <label class="text-[10px] text-gray-400">匯率 (100円)</label>
+            <div class="flex items-center">
+                <span class="text-xs mr-1 text-gray-400">HK$</span>
+                <input type="number" id="exchangeRate" value="0.52" step="0.01" class="w-12 bg-transparent text-lg font-bold border-b border-sakura-200 text-center" onchange="renderAll()">
+            </div>
+        </div>
+    </header>
+
+    <div class="flex gap-2 mb-6">
+        <input type="text" id="newItemName" placeholder="開新項目 (e.g. Dyson 風筒)" 
+            class="flex-1 p-3 bg-white rounded-xl shadow-sm border border-sakura-200 outline-none">
+        <button onclick="createNewItem()" class="bg-sakura-500 text-white px-4 rounded-xl font-bold shadow-md active:scale-95 whitespace-nowrap">
+            開單
+        </button>
+    </div>
+
+    <div id="shoppingList" class="space-y-3">
+        <p class="text-center text-sakura-500/50 py-10">載入數據中...</p>
+    </div>
+
+    <div id="editModal" class="modal fixed inset-0 bg-black/50 hidden z-50 flex items-end sm:items-center justify-center backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 h-[90vh] sm:h-auto flex flex-col">
+            
+            <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                <input type="text" id="modalTitle" class="text-xl font-bold text-gray-800 bg-transparent outline-none w-full" onchange="updateItemName()">
+                <button onclick="closeModal()" class="text-gray-400 text-3xl ml-2">&times;</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto mb-4 space-y-2 pr-1" id="modalPriceList">
+                </div>
+
+            <div class="bg-sakura-100 p-3 rounded-xl">
+                <div class="flex justify-between mb-2">
+                    <span class="text-xs font-bold text-sakura-800">新增報價</span>
+                    <div class="flex items-center bg-white rounded-full p-1 shadow-sm">
+                        <button onclick="setLoc('HK')" id="btnHK" class="px-3 py-1 rounded-full text-xs font-bold transition-all bg-sakura-500 text-white">HK</button>
+                        <button onclick="setLoc('JP')" id="btnJP" class="px-3 py-1 rounded-full text-xs font-bold text-gray-400 transition-all">JP</button>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="newPriceShop" placeholder="店名 (e.g. 百佳)" class="flex-[2] p-2 rounded-lg text-sm border-none shadow-sm outline-none">
+                    <input type="number" id="newPriceVal" placeholder="價錢" class="flex-1 p-2 rounded-lg text-sm border-none shadow-sm outline-none font-mono">
+                </div>
+                
+                <button onclick="addPrice()" class="w-full py-2 bg-sakura-800 text-white rounded-lg text-sm font-bold shadow active:scale-95">
+                    ＋ 加入價錢
+                </button>
+            </div>
+
+            <div class="mt-3 pt-2 border-t border-gray-100 text-center">
+                <button onclick="deleteItem()" class="text-xs text-red-300 hover:text-red-500">刪除成件貨</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue, push, set, remove, update } 
+        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        // ⚠️ 請填入你嘅 Config
+        const firebaseConfig = {
+  apiKey: "AIzaSyDEexFWh65bu1NSgyGNZ1hHnzxBne4f8KI",
+  authDomain: "japanproduct2026.firebaseapp.com",
+  databaseURL: "https://japanproduct2026-default-rtdb.firebaseio.com",
+  projectId: "japanproduct2026",
+  storageBucket: "japanproduct2026.firebasestorage.app",
+  messagingSenderId: "935315868288",
+  appId: "1:935315868288:web:67f05d4feee521ac947465"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const listRef = ref(db, 'shopping_list_v2'); // 改咗個名以免撞舊 data
+
+        let localItems = [];
+        let currentEditingId = null;
+        let currentLoc = 'HK'; // 新增價錢時預設地區
+
+        // 監聽數據
+        onValue(listRef, (snapshot) => {
+            const data = snapshot.val();
+            localItems = [];
+            
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    localItems.push({ id: key, ...data[key] });
+                });
+                localItems.sort((a, b) => (a.order || 0) - (b.order || 0));
+            } else {
+                // 🔥 自動初始化：如果 Database 係吉嘅，自動加兩件貨
+                autoInitData();
+            }
+            
+            renderAll();
+            // 如果開緊 Modal，順便 Refresh 埋 Modal 裡面嘅 list
+            if(currentEditingId) {
+                renderModalList(currentEditingId);
+            }
+        });
+
+        // 自動加入預設貨品
+        function autoInitData() {
+            // 只有當 localItems 真係空嘅時候先做
+            if (localItems.length === 0) {
+                const initItems = ['咖啡磅', '太陽眼鏡'];
+                initItems.forEach((name, idx) => {
+                    const newRef = push(listRef);
+                    set(newRef, { name: name, order: idx, prices: {} });
+                });
+                // 唔使 alert，靜靜地加就得
+            }
+        }
+
+        // 渲染主清單
+        window.renderAll = function() {
+            const listEl = document.getElementById('shoppingList');
+            const rate = parseFloat(document.getElementById('exchangeRate').value) || 0.52;
+            listEl.innerHTML = '';
+
+            localItems.forEach(item => {
+                // 計算最低價
+                let minHK = Infinity;
+                let minJP = Infinity; // YEN
+                let hasHK = false;
+                let hasJP = false;
+
+                if (item.prices) {
+                    Object.values(item.prices).forEach(p => {
+                        const val = parseFloat(p.value);
+                        if (p.loc === 'HK') {
+                            if (val < minHK) minHK = val;
+                            hasHK = true;
+                        } else {
+                            if (val < minJP) minJP = val;
+                            hasJP = true;
+                        }
+                    });
+                }
+
+                // 比較邏輯
+                let statusHtml = '';
+                let borderClass = 'border-l-4 border-sakura-200';
+                
+                if (hasJP) {
+                    const minJP_in_HKD = minJP * rate / 100;
+                    if (hasHK) {
+                        const diff = (minHK - minJP_in_HKD).toFixed(0);
+                        if (minJP_in_HKD < minHK) {
+                            borderClass = 'border-l-4 border-green-400';
+                            statusHtml = `<span class="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-bold">🇯🇵 日本平 $${diff}</span>`;
+                        } else {
+                            statusHtml = `<span class="text-red-400 bg-red-50 px-2 py-1 rounded text-xs font-bold">🇭🇰 香港平 $${Math.abs(diff)}</span>`;
+                        }
+                    } else {
+                        statusHtml = `<span class="text-sakura-500 text-xs">只有日價</span>`;
+                    }
+                } else if (hasHK) {
+                     statusHtml = `<span class="text-gray-400 text-xs">只有港價</span>`;
+                } else {
+                     statusHtml = `<span class="text-gray-300 text-xs">未有報價</span>`;
+                }
+
+                // 顯示最平價錢
+                const showHK = hasHK ? `$${minHK}` : '--';
+                const showJP = hasJP ? `¥${minJP}` : '--';
+
+                const html = `
+                    <div class="item-card bg-white p-4 rounded-xl shadow-sm ${borderClass} relative" onclick="openModal('${item.id}')" data-id="${item.id}">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-gray-800 text-lg">${item.name}</h3>
+                            ${statusHtml}
+                        </div>
+                        <div class="flex text-sm items-center gap-4 text-gray-600">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400 uppercase">最平 HK</span>
+                                <span class="font-mono font-medium">${showHK}</span>
+                            </div>
+                            <div class="w-px h-6 bg-gray-100"></div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400 uppercase">最平 JP</span>
+                                <span class="font-mono font-medium">${showJP}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // 開新 Item
+        window.createNewItem = function() {
+            const name = document.getElementById('newItemName').value;
+            if(!name) return;
+            const newRef = push(listRef);
+            set(newRef, {
+                name: name,
+                order: localItems.length,
+                prices: {}
+            });
+            document.getElementById('newItemName').value = '';
+        }
+
+        // Modal 邏輯
+        window.openModal = function(id) {
+            currentEditingId = id;
+            const item = localItems.find(i => i.id === id);
+            document.getElementById('modalTitle').value = item.name;
+            document.getElementById('editModal').classList.remove('hidden');
+            
+            // 重置輸入欄
+            document.getElementById('newPriceShop').value = '';
+            document.getElementById('newPriceVal').value = '';
+            
+            renderModalList(id);
+        }
+
+        window.closeModal = function() {
+            document.getElementById('editModal').classList.add('hidden');
+            currentEditingId = null;
+        }
+
+        window.renderModalList = function(id) {
+            const item = localItems.find(i => i.id === id);
+            const container = document.getElementById('modalPriceList');
+            container.innerHTML = '';
+
+            if (!item.prices) {
+                container.innerHTML = '<p class="text-center text-gray-300 text-sm py-4">暫未有報價</p>';
+                return;
+            }
+
+            const pricesArr = Object.keys(item.prices).map(key => ({ pid: key, ...item.prices[key] }));
+            
+            // 按價錢排序 (HKD 先, JPY 後)
+            pricesArr.sort((a,b) => (a.loc === b.loc) ? 0 : (a.loc === 'HK' ? -1 : 1));
+
+            pricesArr.forEach(p => {
+                const isHK = p.loc === 'HK';
+                const el = document.createElement('div');
+                el.className = `flex justify-between items-center p-3 rounded-lg border ${isHK ? 'bg-gray-50 border-gray-100' : 'bg-sakura-50 border-sakura-100'}`;
+                el.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isHK ? 'bg-gray-200 text-gray-600' : 'bg-sakura-200 text-sakura-800'}">${p.loc}</span>
+                        <span class="text-sm font-medium text-gray-700">${p.shop}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono font-bold ${isHK ? 'text-gray-800' : 'text-sakura-600'}">${isHK ? '$' : '¥'}${p.value}</span>
+                        <button onclick="removePrice('${item.id}', '${p.pid}')" class="text-gray-300 hover:text-red-400 px-1">×</button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // 新增價錢
+        window.setLoc = function(loc) {
+            currentLoc = loc;
+            const btnHK = document.getElementById('btnHK');
+            const btnJP = document.getElementById('btnJP');
+            if(loc === 'HK') {
+                btnHK.className = "px-3 py-1 rounded-full text-xs font-bold transition-all bg-sakura-500 text-white shadow";
+                btnJP.className = "px-3 py-1 rounded-full text-xs font-bold transition-all text-gray-400";
+            } else {
+                btnHK.className = "px-3 py-1 rounded-full text-xs font-bold transition-all text-gray-400";
+                btnJP.className = "px-3 py-1 rounded-full text-xs font-bold transition-all bg-sakura-500 text-white shadow";
+            }
+        }
+
+        window.addPrice = function() {
+            if(!currentEditingId) return;
+            const shop = document.getElementById('newPriceShop').value || (currentLoc==='HK'?'香港某店':'日本某店');
+            const val = document.getElementById('newPriceVal').value;
+            
+            if(!val) return alert('請輸入價錢');
+
+            const priceRef = push(ref(db, `shopping_list_v2/${currentEditingId}/prices`));
+            set(priceRef, {
+                loc: currentLoc,
+                shop: shop,
+                value: parseFloat(val),
+                timestamp: Date.now()
+            });
+
+            document.getElementById('newPriceShop').value = '';
+            document.getElementById('newPriceVal').value = '';
+        }
+
+        window.removePrice = function(itemId, priceId) {
+            if(confirm('刪除此報價？')) {
+                remove(ref(db, `shopping_list_v2/${itemId}/prices/${priceId}`));
+            }
+        }
+
+        window.updateItemName = function() {
+            if(!currentEditingId) return;
+            const newName = document.getElementById('modalTitle').value;
+            update(ref(db, `shopping_list_v2/${currentEditingId}`), { name: newName });
+        }
+
+        window.deleteItem = function() {
+            if(confirm('確定刪除成個項目？所有報價會消失。')) {
+                remove(ref(db, `shopping_list_v2/${currentEditingId}`));
+                closeModal();
+            }
+        }
+
+        // Sortable
+        new Sortable(document.getElementById('shoppingList'), {
+            animation: 150,
+            ghostClass: 'ghost',
+            delay: 100,
+            delayOnTouchOnly: true,
+            onEnd: function (evt) {
+                const itemEls = document.querySelectorAll('.item-card');
+                const updates = {};
+                itemEls.forEach((el, index) => {
+                    updates[`shopping_list_v2/${el.dataset.id}/order`] = index;
+                });
+                update(ref(db), updates);
+            }
+        });
+        
+        // 點背景關閉
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if(e.target === document.getElementById('editModal')) closeModal();
+        });
+    </script>
+</body>
+</html>
