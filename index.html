@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>日本購物格價簿 🌸</title>
-<link rel="icon" type="image/png" href="icon.png">
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="shortcut icon" type="image/png" href="icon.png">
+    <title>日本購物格價簿 (同步版) 🌸</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,58 +24,51 @@
             }
         }
     </script>
-<style>
-        /* 加入安全區設定，避開劉海同 Home Bar */
+    <style>
+        /* 安全區設定 + 防止左右郁動 */
         body { 
             background-color: #fff5f7; 
             color: #881337;
-            /* 關鍵：防止左右搖擺 */
             overflow-x: hidden; 
-            /* 關鍵：確保內容唔會貼住劉海同底線 */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
-        
         .item-card { touch-action: manipulation; transition: transform 0.1s; cursor: pointer; }
         .modal { transition: opacity 0.2s; }
-        
-        /* 解決 iPhone 輸入時自動放大嘅問題 */
-        input, select, textarea {
-            font-size: 16px !important; 
-        }
+        /* 防止 iPhone 輸入時放大 */
+        input, select, textarea { font-size: 16px !important; }
     </style>
 </head>
 <body class="w-full max-w-lg mx-auto min-h-screen pb-40 px-3">
 
-    <header class="flex justify-between items-end mb-4 px-1">
+    <header class="flex justify-between items-end mb-4 px-1 pt-2">
         <div>
             <h1 class="text-xl font-bold tracking-widest text-sakura-800">お買い物帳</h1>
-            <p class="text-[10px] text-sakura-500">多店舖格價版</p>
+            <p class="text-[10px] text-sakura-500">同步格價清單</p>
         </div>
         <div class="flex flex-col items-end">
             <label class="text-[10px] text-gray-400">匯率 (100円)</label>
             <div class="flex items-center">
                 <span class="text-xs mr-1 text-gray-400">HK$</span>
-                <input type="number" id="exchangeRate" value="0.52" step="0.01" class="w-12 bg-transparent text-lg font-bold border-b border-sakura-200 text-center" onchange="renderAll()">
+                <input type="number" id="exchangeRate" placeholder="-" step="0.01" class="w-12 bg-transparent text-lg font-bold border-b border-sakura-200 text-center text-sakura-800" onchange="updateRate()">
             </div>
         </div>
     </header>
 
-<div class="flex gap-2 mb-6">
-    <input type="text" id="newItemName" placeholder="開新項目 (e.g. Dyson 風筒)" 
-        class="flex-1 min-w-0 p-3 bg-white rounded-xl shadow-sm border border-sakura-200 outline-none">
-    
-    <button onclick="createNewItem()" class="bg-sakura-500 text-white px-4 rounded-xl font-bold shadow-md active:scale-95 whitespace-nowrap">
-        開單
-    </button>
-</div>
+    <div class="flex gap-2 mb-6">
+        <input type="text" id="newItemName" placeholder="開新項目 (e.g. Dyson 風筒)" 
+            class="flex-1 min-w-0 p-3 bg-white rounded-xl shadow-sm border border-sakura-200 outline-none">
+        <button onclick="createNewItem()" class="bg-sakura-500 text-white px-4 rounded-xl font-bold shadow-md active:scale-95 whitespace-nowrap">
+            開單
+        </button>
+    </div>
 
     <div id="shoppingList" class="space-y-3">
         <p class="text-center text-sakura-500/50 py-10">載入數據中...</p>
     </div>
 
     <div id="editModal" class="modal fixed inset-0 bg-black/50 hidden z-50 flex items-end sm:items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 h-[90vh] sm:h-auto flex flex-col">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-4 h-[90vh] sm:h-auto flex flex-col">
             
             <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
                 <input type="text" id="modalTitle" class="text-xl font-bold text-gray-800 bg-transparent outline-none w-full" onchange="updateItemName()">
@@ -93,13 +87,10 @@
                     </div>
                 </div>
                 
-<div class="flex gap-2 mb-2">
-    <input type="text" id="newPriceShop" placeholder="店名 (e.g. 百佳)" 
-        class="flex-[2] min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none">
-    
-    <input type="number" id="newPriceVal" placeholder="價錢" 
-        class="flex-1 min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none font-mono">
-</div>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="newPriceShop" placeholder="店名 (e.g. 百佳)" class="flex-[2] min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none">
+                    <input type="number" id="newPriceVal" placeholder="價錢" class="flex-1 min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none font-mono">
+                </div>
                 
                 <button onclick="addPrice()" class="w-full py-2 bg-sakura-800 text-white rounded-lg text-sm font-bold shadow active:scale-95">
                     ＋ 加入價錢
@@ -117,8 +108,8 @@
         import { getDatabase, ref, onValue, push, set, remove, update } 
         from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        // ⚠️ 請填入你嘅 Config
-        const firebaseConfig = {
+        // 🔥🔥🔥 記得填返你個 Config 🔥🔥🔥
+const firebaseConfig = {
   apiKey: "AIzaSyDEexFWh65bu1NSgyGNZ1hHnzxBne4f8KI",
   authDomain: "japanproduct2026.firebaseapp.com",
   databaseURL: "https://japanproduct2026-default-rtdb.firebaseio.com",
@@ -130,57 +121,72 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const listRef = ref(db, 'shopping_list_v2'); // 改咗個名以免撞舊 data
+        
+        // 分開兩個 Ref：一個係清單，一個係設定
+        const listRef = ref(db, 'shopping_list_v2'); 
+        const configRef = ref(db, 'config/exchangeRate'); 
 
         let localItems = [];
         let currentEditingId = null;
-        let currentLoc = 'HK'; // 新增價錢時預設地區
+        let currentLoc = 'HK';
+        let currentRate = 0.52; // 預設值
 
-        // 監聽數據
+        // 1. 監聽匯率變化 (一開 App 會自動 Load)
+        onValue(configRef, (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                currentRate = parseFloat(val);
+                document.getElementById('exchangeRate').value = currentRate;
+                renderAll(); // 匯率變咗，即刻重計所有價錢
+            } else {
+                // 如果 Database 未有匯率，就 Set 個預設入去
+                set(configRef, 0.52);
+            }
+        });
+
+        // 2. 用戶手動改匯率 -> Upload 去 Firebase
+        window.updateRate = function() {
+            const val = document.getElementById('exchangeRate').value;
+            if (val) {
+                set(configRef, parseFloat(val));
+            }
+        }
+
+        // 監聽清單數據
         onValue(listRef, (snapshot) => {
             const data = snapshot.val();
             localItems = [];
-            
             if (data) {
                 Object.keys(data).forEach(key => {
                     localItems.push({ id: key, ...data[key] });
                 });
                 localItems.sort((a, b) => (a.order || 0) - (b.order || 0));
             } else {
-                // 🔥 自動初始化：如果 Database 係吉嘅，自動加兩件貨
                 autoInitData();
             }
-            
             renderAll();
-            // 如果開緊 Modal，順便 Refresh 埋 Modal 裡面嘅 list
-            if(currentEditingId) {
-                renderModalList(currentEditingId);
-            }
+            if(currentEditingId) renderModalList(currentEditingId);
         });
 
-        // 自動加入預設貨品
         function autoInitData() {
-            // 只有當 localItems 真係空嘅時候先做
             if (localItems.length === 0) {
                 const initItems = ['咖啡磅', '太陽眼鏡'];
                 initItems.forEach((name, idx) => {
                     const newRef = push(listRef);
                     set(newRef, { name: name, order: idx, prices: {} });
                 });
-                // 唔使 alert，靜靜地加就得
             }
         }
 
-        // 渲染主清單
         window.renderAll = function() {
             const listEl = document.getElementById('shoppingList');
-            const rate = parseFloat(document.getElementById('exchangeRate').value) || 0.52;
+            // 用返即時 Load 到嘅 currentRate
+            const rate = currentRate; 
             listEl.innerHTML = '';
 
             localItems.forEach(item => {
-                // 計算最低價
                 let minHK = Infinity;
-                let minJP = Infinity; // YEN
+                let minJP = Infinity; 
                 let hasHK = false;
                 let hasJP = false;
 
@@ -197,7 +203,6 @@
                     });
                 }
 
-                // 比較邏輯
                 let statusHtml = '';
                 let borderClass = 'border-l-4 border-sakura-200';
                 
@@ -220,7 +225,6 @@
                      statusHtml = `<span class="text-gray-300 text-xs">未有報價</span>`;
                 }
 
-                // 顯示最平價錢
                 const showHK = hasHK ? `$${minHK}` : '--';
                 const showJP = hasJP ? `¥${minJP}` : '--';
 
@@ -247,7 +251,6 @@
             });
         }
 
-        // 開新 Item
         window.createNewItem = function() {
             const name = document.getElementById('newItemName').value;
             if(!name) return;
@@ -260,17 +263,13 @@
             document.getElementById('newItemName').value = '';
         }
 
-        // Modal 邏輯
         window.openModal = function(id) {
             currentEditingId = id;
             const item = localItems.find(i => i.id === id);
             document.getElementById('modalTitle').value = item.name;
             document.getElementById('editModal').classList.remove('hidden');
-            
-            // 重置輸入欄
             document.getElementById('newPriceShop').value = '';
             document.getElementById('newPriceVal').value = '';
-            
             renderModalList(id);
         }
 
@@ -283,15 +282,11 @@
             const item = localItems.find(i => i.id === id);
             const container = document.getElementById('modalPriceList');
             container.innerHTML = '';
-
             if (!item.prices) {
                 container.innerHTML = '<p class="text-center text-gray-300 text-sm py-4">暫未有報價</p>';
                 return;
             }
-
             const pricesArr = Object.keys(item.prices).map(key => ({ pid: key, ...item.prices[key] }));
-            
-            // 按價錢排序 (HKD 先, JPY 後)
             pricesArr.sort((a,b) => (a.loc === b.loc) ? 0 : (a.loc === 'HK' ? -1 : 1));
 
             pricesArr.forEach(p => {
@@ -312,7 +307,6 @@
             });
         }
 
-        // 新增價錢
         window.setLoc = function(loc) {
             currentLoc = loc;
             const btnHK = document.getElementById('btnHK');
@@ -330,9 +324,7 @@
             if(!currentEditingId) return;
             const shop = document.getElementById('newPriceShop').value || (currentLoc==='HK'?'香港某店':'日本某店');
             const val = document.getElementById('newPriceVal').value;
-            
             if(!val) return alert('請輸入價錢');
-
             const priceRef = push(ref(db, `shopping_list_v2/${currentEditingId}/prices`));
             set(priceRef, {
                 loc: currentLoc,
@@ -340,15 +332,12 @@
                 value: parseFloat(val),
                 timestamp: Date.now()
             });
-
             document.getElementById('newPriceShop').value = '';
             document.getElementById('newPriceVal').value = '';
         }
 
         window.removePrice = function(itemId, priceId) {
-            if(confirm('刪除此報價？')) {
-                remove(ref(db, `shopping_list_v2/${itemId}/prices/${priceId}`));
-            }
+            if(confirm('刪除此報價？')) remove(ref(db, `shopping_list_v2/${itemId}/prices/${priceId}`));
         }
 
         window.updateItemName = function() {
@@ -364,7 +353,6 @@
             }
         }
 
-        // Sortable
         new Sortable(document.getElementById('shoppingList'), {
             animation: 150,
             ghostClass: 'ghost',
@@ -380,7 +368,6 @@
             }
         });
         
-        // 點背景關閉
         document.getElementById('editModal').addEventListener('click', (e) => {
             if(e.target === document.getElementById('editModal')) closeModal();
         });
