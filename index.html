@@ -2,7 +2,7 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>日本購物格價簿 🌸</title>
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -23,16 +23,28 @@
             }
         }
     </script>
-    <style>
-        body { background-color: #fff5f7; color: #881337; }
+<style>
+        /* 加入安全區設定，避開劉海同 Home Bar */
+        body { 
+            background-color: #fff5f7; 
+            color: #881337;
+            /* 關鍵：防止左右搖擺 */
+            overflow-x: hidden; 
+            /* 關鍵：確保內容唔會貼住劉海同底線 */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
         .item-card { touch-action: manipulation; transition: transform 0.1s; cursor: pointer; }
         .modal { transition: opacity 0.2s; }
-        /* Toggle Switch */
-        .toggle-checkbox:checked { right: 0; border-color: #ef4444; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #ef4444; } 
+        
+        /* 解決 iPhone 輸入時自動放大嘅問題 */
+        input, select, textarea {
+            font-size: 16px !important; 
+        }
     </style>
 </head>
-<body class="p-3 max-w-md mx-auto min-h-screen pb-40">
+<body class="w-full max-w-lg mx-auto min-h-screen pb-40 px-3">
 
     <header class="flex justify-between items-end mb-4 px-1">
         <div>
