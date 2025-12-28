@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>日本購物格價簿 (同步版) 🌸</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="日本購物">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#fff5f7">
+
+    <title>日本購物格價簿 🌸</title>
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>">
-    <link rel="apple-touch-icon" href="icon.png">
-
+    <link rel="apple-touch-icon" href="icon.png"> 
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,18 +32,22 @@
         }
     </script>
     <style>
-        /* 安全區設定 + 防止左右郁動 */
+        /* 安全區設定：避開 iPhone 劉海同底線 */
         body { 
             background-color: #fff5f7; 
             color: #881337;
             overflow-x: hidden; 
-            padding-top: env(safe-area-inset-top);
+            padding-top: max(12px, env(safe-area-inset-top)); /* 確保唔會頂住個狀態欄 */
             padding-bottom: env(safe-area-inset-bottom);
+            /* 禁止選取文字，令感覺更似 App */
+            user-select: none;
+            -webkit-user-select: none;
         }
+        /* 允許輸入框選字 */
+        input, textarea { user-select: text; -webkit-user-select: text; font-size: 16px !important; }
+        
         .item-card { touch-action: manipulation; transition: transform 0.1s; cursor: pointer; }
         .modal { transition: opacity 0.2s; }
-        /* 防止 iPhone 輸入時放大 */
-        input, select, textarea { font-size: 16px !important; }
     </style>
 </head>
 <body class="w-full max-w-lg mx-auto min-h-screen pb-40 px-3">
@@ -88,7 +99,7 @@
                 </div>
                 
                 <div class="flex gap-2 mb-2">
-                    <input type="text" id="newPriceShop" placeholder="店名 (e.g. 百佳)" class="flex-[2] min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none">
+                    <input type="text" id="newPriceShop" placeholder="店名" class="flex-[2] min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none">
                     <input type="number" id="newPriceVal" placeholder="價錢" class="flex-1 min-w-0 p-2 rounded-lg text-sm border-none shadow-sm outline-none font-mono">
                 </div>
                 
@@ -108,7 +119,7 @@
         import { getDatabase, ref, onValue, push, set, remove, update } 
         from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        // 🔥🔥🔥 記得填返你個 Config 🔥🔥🔥
+        // 🔥🔥🔥 記得再次填返你個 Config 🔥🔥🔥
 const firebaseConfig = {
   apiKey: "AIzaSyDEexFWh65bu1NSgyGNZ1hHnzxBne4f8KI",
   authDomain: "japanproduct2026.firebaseapp.com",
@@ -119,32 +130,29 @@ const firebaseConfig = {
   appId: "1:935315868288:web:67f05d4feee521ac947465"
 };
 
+
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        
-        // 分開兩個 Ref：一個係清單，一個係設定
         const listRef = ref(db, 'shopping_list_v2'); 
         const configRef = ref(db, 'config/exchangeRate'); 
 
         let localItems = [];
         let currentEditingId = null;
         let currentLoc = 'HK';
-        let currentRate = 0.52; // 預設值
+        let currentRate = 0.52; 
 
-        // 1. 監聽匯率變化 (一開 App 會自動 Load)
+        // 監聽匯率
         onValue(configRef, (snapshot) => {
             const val = snapshot.val();
             if (val) {
                 currentRate = parseFloat(val);
                 document.getElementById('exchangeRate').value = currentRate;
-                renderAll(); // 匯率變咗，即刻重計所有價錢
+                renderAll(); 
             } else {
-                // 如果 Database 未有匯率，就 Set 個預設入去
                 set(configRef, 0.52);
             }
         });
 
-        // 2. 用戶手動改匯率 -> Upload 去 Firebase
         window.updateRate = function() {
             const val = document.getElementById('exchangeRate').value;
             if (val) {
@@ -152,7 +160,7 @@ const firebaseConfig = {
             }
         }
 
-        // 監聽清單數據
+        // 監聽清單
         onValue(listRef, (snapshot) => {
             const data = snapshot.val();
             localItems = [];
@@ -180,7 +188,6 @@ const firebaseConfig = {
 
         window.renderAll = function() {
             const listEl = document.getElementById('shoppingList');
-            // 用返即時 Load 到嘅 currentRate
             const rate = currentRate; 
             listEl.innerHTML = '';
 
@@ -255,11 +262,7 @@ const firebaseConfig = {
             const name = document.getElementById('newItemName').value;
             if(!name) return;
             const newRef = push(listRef);
-            set(newRef, {
-                name: name,
-                order: localItems.length,
-                prices: {}
-            });
+            set(newRef, { name: name, order: localItems.length, prices: {} });
             document.getElementById('newItemName').value = '';
         }
 
